@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 /// Parse a vec of bytes as hex String
-pub fn parse_hex(input: &Vec<u8>) -> String {
+pub fn parse_hex(input: &[u8]) -> String {
     let value: Vec<char> = hex::encode_upper(input).chars().collect();
     let split = value
         .chunks(2)
@@ -12,12 +12,12 @@ pub fn parse_hex(input: &Vec<u8>) -> String {
 }
 
 /// Parse a vec of bytes as a String
-pub fn parse_string(input: &Vec<u8>) -> String {
-    String::from_utf8_lossy(&input).to_owned().to_string()
+pub fn parse_string(input: &[u8]) -> String {
+    String::from_utf8_lossy(input).to_owned().to_string()
 }
 
 /// Parse a vec of bytes as u8
-pub fn parse_u8(input: &Vec<u8>) -> u8 {
+pub fn parse_u8(input: &[u8]) -> u8 {
     let to_array =
         |slice: &[u8]| -> [u8; 1] { slice.try_into().expect("slice with incorrect length") };
 
@@ -25,7 +25,7 @@ pub fn parse_u8(input: &Vec<u8>) -> u8 {
 }
 
 /// Parse a vec of bytes as i8
-pub fn parse_i8(input: &Vec<u8>) -> i8 {
+pub fn parse_i8(input: &[u8]) -> i8 {
     let to_array =
         |slice: &[u8]| -> [u8; 1] { slice.try_into().expect("slice with incorrect length") };
 
@@ -33,7 +33,7 @@ pub fn parse_i8(input: &Vec<u8>) -> i8 {
 }
 
 /// Parse a vec of bytes as u16
-pub fn parse_u16(input: &Vec<u8>) -> u16 {
+pub fn parse_u16(input: &[u8]) -> u16 {
     let to_array =
         |slice: &[u8]| -> [u8; 2] { slice.try_into().expect("slice with incorrect length") };
 
@@ -41,7 +41,7 @@ pub fn parse_u16(input: &Vec<u8>) -> u16 {
 }
 
 /// Parse a vec of bytes as u32
-pub fn parse_u32(input: &Vec<u8>) -> u32 {
+pub fn parse_u32(input: &[u8]) -> u32 {
     let to_array =
         |slice: &[u8]| -> [u8; 4] { slice.try_into().expect("slice with incorrect length") };
 
@@ -49,7 +49,7 @@ pub fn parse_u32(input: &Vec<u8>) -> u32 {
 }
 
 /// Parse a vec of bytes as i32
-pub fn parse_i32(input: &Vec<u8>) -> i32 {
+pub fn parse_i32(input: &[u8]) -> i32 {
     let to_array =
         |slice: &[u8]| -> [u8; 4] { slice.try_into().expect("slice with incorrect length") };
 
@@ -57,7 +57,7 @@ pub fn parse_i32(input: &Vec<u8>) -> i32 {
 }
 
 /// Parse a vec of bytes as u64
-pub fn parse_u64(input: &Vec<u8>) -> u64 {
+pub fn parse_u64(input: &[u8]) -> u64 {
     let to_array =
         |slice: &[u8]| -> [u8; 8] { slice.try_into().expect("slice with incorrect length") };
 

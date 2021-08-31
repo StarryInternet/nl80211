@@ -91,15 +91,15 @@ impl fmt::Display for Interface {
         let mut result = Vec::new();
 
         if let Some(ssid) = &self.ssid {
-            result.push(format!("essid : {}", parse_string(&ssid)))
+            result.push(format!("essid : {}", parse_string(ssid)))
         };
 
         if let Some(mac) = &self.mac {
-            result.push(format!("mac : {}", parse_hex(&mac)))
+            result.push(format!("mac : {}", parse_hex(mac)))
         };
 
         if let Some(name) = &self.name {
-            result.push(format!("interface : {}", parse_string(&name)))
+            result.push(format!("interface : {}", parse_string(name)))
         };
 
         if let Some(frequency) = &self.frequency {
