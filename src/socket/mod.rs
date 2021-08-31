@@ -83,7 +83,7 @@ impl Socket {
 
         Ok(Self {
             sock: nl80211sock,
-            family_id: family_id,
+            family_id,
         })
     }
 
@@ -158,7 +158,7 @@ impl Socket {
     /// #   Ok(())
     /// # }
     ///```
-    pub fn get_station_info(&mut self, interface_attr_if_index: &Vec<u8>) -> Result<Station, neli::err::NlError>  {
+    pub fn get_station_info(&mut self, interface_attr_if_index: &[u8]) -> Result<Station, neli::err::NlError>  {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];
@@ -190,10 +190,10 @@ impl Socket {
                     },
             };
         }
-        return Ok(Station::default())
+        Ok(Station::default())
     }
 
-    pub fn get_bss_info(&mut self, interface_attr_if_index: &Vec<u8>) -> Result<Bss, neli::err::NlError> {
+    pub fn get_bss_info(&mut self, interface_attr_if_index: &[u8]) -> Result<Bss, neli::err::NlError> {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];

@@ -89,11 +89,8 @@ impl ParseNlAttr for Station {
                                 let bit_rate_handle =
                                     sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
                                 for sub_sub_attr in bit_rate_handle.iter() {
-                                    match sub_sub_attr.nla_type {
-                                        Nl80211RateInfo::RateInfoBitrate32 => {
-                                            self.rx_bitrate = Some(sub_sub_attr.payload.clone())
-                                        }
-                                        _ => (),
+                                    if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
+                                        self.rx_bitrate = Some(sub_sub_attr.payload.clone())
                                     }
                                 }
                             }
@@ -101,11 +98,8 @@ impl ParseNlAttr for Station {
                                 let bit_rate_handle =
                                     sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
                                 for sub_sub_attr in bit_rate_handle.iter() {
-                                    match sub_sub_attr.nla_type {
-                                        Nl80211RateInfo::RateInfoBitrate32 => {
-                                            self.tx_bitrate = Some(sub_sub_attr.payload.clone())
-                                        }
-                                        _ => (),
+                                    if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
+                                        self.tx_bitrate = Some(sub_sub_attr.payload.clone())
                                     }
                                 }
                             }

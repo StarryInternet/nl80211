@@ -80,30 +80,27 @@ impl ParseNlAttr for Bss {
     fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Bss {
         for attr in handle.iter() {
             println!("{:?}", attr);
-            match attr.nla_type {
-                Nl80211Attr::AttrBss => {
-                    let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
-                    for sub_attr in sub_handle.iter() {
-                        match sub_attr.nla_type {
-                            Nl80211Bss::BssBeaconInterval => {
-                                self.beacon_interval = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssFrequency => {
-                                self.frequency = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssSeenMsAgo => {
-                                self.seen_ms_ago = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssStatus => self.status = Some(sub_attr.payload.clone()),
-                            Nl80211Bss::BssBssid => self.bssid = Some(sub_attr.payload.clone()),
-                            Nl80211Bss::BssSignalMbm => {
-                                self.signal = Some(sub_attr.payload.clone())
-                            }
-                            _ => (),
+            if attr.nla_type == Nl80211Attr::AttrBss {
+                let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
+                for sub_attr in sub_handle.iter() {
+                    match sub_attr.nla_type {
+                        Nl80211Bss::BssBeaconInterval => {
+                            self.beacon_interval = Some(sub_attr.payload.clone())
                         }
+                        Nl80211Bss::BssFrequency => {
+                            self.frequency = Some(sub_attr.payload.clone())
+                        }
+                        Nl80211Bss::BssSeenMsAgo => {
+                            self.seen_ms_ago = Some(sub_attr.payload.clone())
+                        }
+                        Nl80211Bss::BssStatus => self.status = Some(sub_attr.payload.clone()),
+                        Nl80211Bss::BssBssid => self.bssid = Some(sub_attr.payload.clone()),
+                        Nl80211Bss::BssSignalMbm => {
+                            self.signal = Some(sub_attr.payload.clone())
+                        }
+                        _ => (),
                     }
                 }
-                _ => (),
             }
         }
         self.to_owned()
