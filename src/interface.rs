@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::attr::*;
 use crate::nl80211traits::ParseNlAttr;
 use crate::parse_attr::parse_u32;
@@ -6,6 +5,7 @@ use crate::parse_attr::parse_u64;
 use crate::socket::Socket;
 use crate::station::Station;
 use neli::nlattr::AttrHandle;
+use std::fmt;
 
 use crate::parse_attr::{parse_hex, parse_string};
 
