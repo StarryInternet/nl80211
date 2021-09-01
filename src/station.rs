@@ -1,8 +1,8 @@
-use std::fmt;
 use crate::attr::{Nl80211Attr, Nl80211RateInfo, Nl80211StaInfo};
 use crate::nl80211traits::*;
 use crate::parse_attr::{parse_hex, parse_i8, parse_u32};
 use neli::nlattr::AttrHandle;
+use std::fmt;
 
 /// A struct representing a remote station (Access Point)
 #[derive(Clone, Debug, PartialEq)]

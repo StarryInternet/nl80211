@@ -1,9 +1,9 @@
-use std::fmt;
 use crate::attr::Nl80211Attr;
 use crate::attr::Nl80211Bss;
 use crate::nl80211traits::ParseNlAttr;
 use crate::parse_attr::{parse_hex, parse_i32, parse_u16, parse_u32};
 use neli::nlattr::AttrHandle;
+use std::fmt;
 
 /// A struct representing a BSS (Basic Service Set)
 #[derive(Debug, Clone, PartialEq)]
@@ -87,17 +87,13 @@ impl ParseNlAttr for Bss {
                         Nl80211Bss::BssBeaconInterval => {
                             self.beacon_interval = Some(sub_attr.payload.clone())
                         }
-                        Nl80211Bss::BssFrequency => {
-                            self.frequency = Some(sub_attr.payload.clone())
-                        }
+                        Nl80211Bss::BssFrequency => self.frequency = Some(sub_attr.payload.clone()),
                         Nl80211Bss::BssSeenMsAgo => {
                             self.seen_ms_ago = Some(sub_attr.payload.clone())
                         }
                         Nl80211Bss::BssStatus => self.status = Some(sub_attr.payload.clone()),
                         Nl80211Bss::BssBssid => self.bssid = Some(sub_attr.payload.clone()),
-                        Nl80211Bss::BssSignalMbm => {
-                            self.signal = Some(sub_attr.payload.clone())
-                        }
+                        Nl80211Bss::BssSignalMbm => self.signal = Some(sub_attr.payload.clone()),
                         _ => (),
                     }
                 }
