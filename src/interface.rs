@@ -20,7 +20,7 @@ pub struct Interface {
     pub name: Option<String>,
     /// Interface frequency of the selected channel (MHz)
     pub frequency: Option<u32>,
-    /// Interface chanel
+    /// Interface channel
     pub channel: Option<u32>,
     /// Interface transmit power level in signed mBm units.
     pub power: Option<u32>,
