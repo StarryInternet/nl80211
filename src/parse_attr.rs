@@ -1,27 +1,26 @@
+use macaddr::MacAddr;
 use std::convert::TryInto;
-
-/// Parse a vec of bytes as hex String
-pub fn parse_hex(input: &[u8]) -> String {
-    let value: Vec<char> = hex::encode_upper(input).chars().collect();
-    let split = value
-        .chunks(2)
-        .map(|chunk| chunk.iter().collect::<String>())
-        .collect::<Vec<String>>();
-
-    split.join(":")
-}
 
 /// Parse a vec of bytes as a String
 pub fn parse_string(input: &[u8]) -> String {
     String::from_utf8_lossy(input).to_owned().to_string()
 }
 
-/// Parse a vec of bytes as u8
-pub fn parse_u8(input: &[u8]) -> u8 {
-    let to_array =
-        |slice: &[u8]| -> [u8; 1] { slice.try_into().expect("slice with incorrect length") };
-
-    u8::from_le_bytes(to_array(input))
+/// Parse a vec of bytes as a mac address
+pub fn parse_macaddr(input: &[u8]) -> MacAddr {
+    if input.len() == 6 {
+        let array: [u8; 6] = input
+            .try_into()
+            .expect("Slice with incorrect number of bytes");
+        array.into()
+    } else if input.len() == 8 {
+        let array: [u8; 8] = input
+            .try_into()
+            .expect("Slice with incorrect number of bytes");
+        array.into()
+    } else {
+        panic!("Mac address should be 6 or 8 bytes");
+    }
 }
 
 /// Parse a vec of bytes as i8
@@ -69,27 +68,10 @@ mod test_type_conversion {
     use super::*;
 
     #[test]
-    fn test_parse_hex() {
-        let bytes_input: Vec<u8> = vec![255, 255, 255, 255, 255, 255];
-        assert_eq!(parse_hex(&bytes_input), "FF:FF:FF:FF:FF:FF".to_string());
-    }
-
-    #[test]
     fn test_parse_string() {
         let input_string = "test".to_string();
         let bytes_string = input_string.as_bytes().to_vec();
         assert_eq!(parse_string(&bytes_string), input_string);
-    }
-
-    #[test]
-    fn test_parse_u8() {
-        assert_eq!(parse_u8(&vec![8]), 8 as u8);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_parse_u8_should_panic() {
-        assert_eq!(parse_u8(&vec![8, 0]), 8 as u8);
     }
 
     #[test]

@@ -12,4 +12,4 @@ repository = "https://github.com/Eonm/nl80211"
 
 [dependencies]
 neli = "0.4.3-r1"
-hex = "0.4.0"
+macaddr = "1.0.1"

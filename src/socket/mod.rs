@@ -149,7 +149,7 @@ impl Socket {
     ///     if let Some(netlink_index) = wifi_interface.index {
     ///
     ///       // Then for each wifi interface we can fetch station information
-    ///       let station_info = Socket::connect()?.get_station_info(&netlink_index.clone())?;
+    ///       let station_info = Socket::connect()?.get_station_info(netlink_index)?;
     ///           println!("{}", station_info);
     ///       }
     ///     }
@@ -158,15 +158,16 @@ impl Socket {
     ///```
     pub fn get_station_info(
         &mut self,
-        interface_attr_if_index: &[u8],
+        interface_attr_if_index: u32,
     ) -> Result<Station, neli::err::NlError> {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];
+        let interface_attr_if_index = interface_attr_if_index.to_le_bytes();
         let new_attr = Nlattr::new(
             None,
             Nl80211Attr::AttrIfindex,
-            interface_attr_if_index.to_owned(),
+            interface_attr_if_index.to_vec(),
         )?;
         attrs.push(new_attr);
 
@@ -200,16 +201,17 @@ impl Socket {
 
     pub fn get_bss_info(
         &mut self,
-        interface_attr_if_index: &[u8],
+        interface_attr_if_index: u32,
     ) -> Result<Bss, neli::err::NlError> {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];
 
+        let interface_attr_if_index = interface_attr_if_index.to_le_bytes();
         let new_attr = Nlattr::new(
             None,
             Nl80211Attr::AttrIfindex,
-            interface_attr_if_index.to_owned(),
+            interface_attr_if_index.to_vec(),
         )?;
         attrs.push(new_attr);
 
