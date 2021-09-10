@@ -2,11 +2,12 @@ use crate::attr::{Nl80211Attr, Nl80211RateInfo, Nl80211StaInfo};
 use crate::nl80211traits::*;
 use crate::parse_attr::{parse_i8, parse_macaddr, parse_u32};
 use macaddr::MacAddr;
+use neli::err::NlError;
 use neli::nlattr::AttrHandle;
 use std::fmt;
 
 /// A struct representing a remote station (Access Point)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Station {
     /// Signal strength average
     pub average_signal: Option<i8>,
@@ -32,64 +33,49 @@ pub struct Station {
     pub tx_retries: Option<u32>,
 }
 
-impl Station {
-    pub fn default() -> Station {
-        Station {
-            bssid: None,
-            connected_time: None,
-            beacon_loss: None,
-            signal: None,
-            average_signal: None,
-            rx_packets: None,
-            tx_packets: None,
-            rx_bitrate: None,
-            tx_bitrate: None,
-            tx_retries: None,
-            tx_failed: None,
-        }
-    }
-}
-
-impl ParseNlAttr for Station {
+impl FromNlAttributeHandle for Station {
     /// Parse netlink messages returned by the nl80211 command CmdGetStation
-    fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Station {
+    fn from_handle(handle: AttrHandle<Nl80211Attr>) -> Result<Station, NlError> {
+        let mut station = Station {
+            ..Default::default()
+        };
         for attr in handle.iter() {
             match attr.nla_type {
-                Nl80211Attr::AttrMac => self.bssid = Some(parse_macaddr(&attr.payload)),
+                Nl80211Attr::AttrMac => station.bssid = Some(parse_macaddr(&attr.payload)),
                 Nl80211Attr::AttrStaInfo => {
                     let sub_handle = attr.get_nested_attributes::<Nl80211StaInfo>().unwrap();
                     for sub_attr in sub_handle.iter() {
                         match sub_attr.nla_type {
                             Nl80211StaInfo::StaInfoSignal => {
-                                self.signal = Some(parse_i8(&sub_attr.payload))
+                                station.signal = Some(parse_i8(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoSignalAvg => {
-                                self.average_signal = Some(parse_i8(&sub_attr.payload))
+                                station.average_signal = Some(parse_i8(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoBeaconLoss => {
-                                self.beacon_loss = Some(parse_u32(&sub_attr.payload))
+                                station.beacon_loss = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoConnectedTime => {
-                                self.connected_time = Some(parse_u32(&sub_attr.payload))
+                                station.connected_time = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoRxPackets => {
-                                self.rx_packets = Some(parse_u32(&sub_attr.payload))
+                                station.rx_packets = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoTxPackets => {
-                                self.tx_packets = Some(parse_u32(&sub_attr.payload))
+                                station.tx_packets = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoTxRetries => {
-                                self.tx_retries = Some(parse_u32(&sub_attr.payload))
+                                station.tx_retries = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoTxFailed => {
-                                self.tx_failed = Some(parse_u32(&sub_attr.payload))
+                                station.tx_failed = Some(parse_u32(&sub_attr.payload))
                             }
                             Nl80211StaInfo::StaInfoRxBitrate => {
                                 let bit_rate_handle =
                                     sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
                                 for sub_sub_attr in bit_rate_handle.iter() {
                                     if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
-                                        self.rx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
+                                        station.rx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
                                     }
                                 }
                             }
@@ -98,7 +84,7 @@ impl ParseNlAttr for Station {
                                     sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
                                 for sub_sub_attr in bit_rate_handle.iter() {
                                     if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
-                                        self.tx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
+                                        station.tx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
                                     }
                                 }
                             }
@@ -109,7 +95,7 @@ impl ParseNlAttr for Station {
                 _ => (),
             }
         }
-        self.to_owned()
+        Ok(station)
     }
 }
 
@@ -329,7 +315,7 @@ mod tests_station {
             },
         ];
 
-        let station = Station::default().parse(neli::nlattr::AttrHandle::Owned(handler));
+        let station = Station::from_handle(neli::nlattr::AttrHandle::Owned(handler)).unwrap();
         let expected_station = Station {
             average_signal: Some(-41),
             beacon_loss: Some(0),

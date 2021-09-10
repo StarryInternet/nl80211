@@ -1,14 +1,15 @@
 use crate::attr::*;
-use crate::nl80211traits::ParseNlAttr;
+use crate::nl80211traits::FromNlAttributeHandle;
 use crate::parse_attr::{parse_macaddr, parse_string, parse_u32, parse_u64};
 use crate::socket::Socket;
 use crate::station::Station;
 use macaddr::MacAddr;
+use neli::err::NlError;
 use neli::nlattr::AttrHandle;
 use std::fmt;
 
 /// A struct representing a wifi interface
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Interface {
     /// A netlink interface index. This index is used to fetch extra information with nl80211
     pub index: Option<u32>,
@@ -31,20 +32,6 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn default() -> Interface {
-        Interface {
-            index: None,
-            ssid: None,
-            mac: None,
-            name: None,
-            frequency: None,
-            channel: None,
-            power: None,
-            phy: None,
-            device: None,
-        }
-    }
-
     /// Get station info for this interface
     pub fn get_station_info(&self) -> Result<Station, neli::err::NlError> {
         if let Some(index) = self.index {
@@ -55,32 +42,37 @@ impl Interface {
     }
 }
 
-impl ParseNlAttr for Interface {
+impl FromNlAttributeHandle for Interface {
     /// Parse netlink messages returned by the nl80211 command CmdGetInterface
-    fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Interface {
+    fn from_handle(handle: AttrHandle<Nl80211Attr>) -> Result<Interface, NlError> {
+        let mut interface = Interface {
+            ..Default::default()
+        };
         for attr in handle.iter() {
             match attr.nla_type {
                 Nl80211Attr::AttrIfindex => {
-                    self.index = Some(parse_u32(&attr.payload));
+                    interface.index = Some(parse_u32(&attr.payload));
                 }
                 Nl80211Attr::AttrSsid => {
-                    self.ssid = Some(parse_string(&attr.payload));
+                    interface.ssid = Some(parse_string(&attr.payload));
                 }
                 Nl80211Attr::AttrMac => {
-                    self.mac = Some(parse_macaddr(&attr.payload));
+                    interface.mac = Some(parse_macaddr(&attr.payload));
                 }
                 Nl80211Attr::AttrIfname => {
-                    self.name = Some(parse_string(&attr.payload));
+                    interface.name = Some(parse_string(&attr.payload));
                 }
-                Nl80211Attr::AttrWiphyFreq => self.frequency = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrChannelWidth => self.channel = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrWiphyTxPowerLevel => self.power = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrWiphy => self.phy = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrWdev => self.device = Some(parse_u64(&attr.payload)),
+                Nl80211Attr::AttrWiphyFreq => interface.frequency = Some(parse_u32(&attr.payload)),
+                Nl80211Attr::AttrChannelWidth => interface.channel = Some(parse_u32(&attr.payload)),
+                Nl80211Attr::AttrWiphyTxPowerLevel => {
+                    interface.power = Some(parse_u32(&attr.payload))
+                }
+                Nl80211Attr::AttrWiphy => interface.phy = Some(parse_u32(&attr.payload)),
+                Nl80211Attr::AttrWdev => interface.device = Some(parse_u64(&attr.payload)),
                 _ => (),
             }
         }
-        self.to_owned()
+        Ok(interface)
     }
 }
 
@@ -234,7 +226,7 @@ mod test_interface {
             },
         ];
 
-        let interface = Interface::default().parse(neli::nlattr::AttrHandle::Owned(handler));
+        let interface = Interface::from_handle(neli::nlattr::AttrHandle::Owned(handler)).unwrap();
 
         let expected_interface = Interface {
             index: Some(3),

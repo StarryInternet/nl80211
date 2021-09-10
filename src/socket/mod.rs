@@ -1,5 +1,5 @@
 use crate::bss::Bss;
-use crate::nl80211traits::ParseNlAttr;
+use crate::nl80211traits::FromNlAttributeHandle;
 use crate::station::Station;
 // use crate::station::parse_station;
 use crate::attr::Nl80211Attr;
@@ -127,7 +127,7 @@ impl Socket {
                 Nlmsg::Done => break,
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
-                    interfaces.push(Interface::default().parse(handle));
+                    interfaces.push(Interface::from_handle(handle)?);
                 }
             };
         }
@@ -192,7 +192,7 @@ impl Socket {
                 Nlmsg::Done => break,
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
-                    return Ok(Station::default().parse(handle));
+                    return Station::from_handle(handle);
                 }
             };
         }
@@ -236,7 +236,7 @@ impl Socket {
                 Nlmsg::Done => break,
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
-                    return Ok(Bss::default().parse(handle));
+                    return Bss::from_handle(handle);
                 }
             }
         }

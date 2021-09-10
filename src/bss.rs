@@ -1,13 +1,14 @@
 use crate::attr::Nl80211Attr;
 use crate::attr::Nl80211Bss;
-use crate::nl80211traits::ParseNlAttr;
+use crate::nl80211traits::FromNlAttributeHandle;
 use crate::parse_attr::{parse_i32, parse_macaddr, parse_u16, parse_u32};
 use macaddr::MacAddr;
+use neli::err::NlError;
 use neli::nlattr::AttrHandle;
 use std::fmt;
 
 /// A struct representing a BSS (Basic Service Set)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bss {
     pub bssid: Option<MacAddr>,
     /// Frequency in MHz
@@ -20,19 +21,6 @@ pub struct Bss {
     pub status: Option<bool>,
     /// Signal strength of probe response/beacon in mBm (100 * dBm)
     pub signal: Option<i32>,
-}
-
-impl Bss {
-    pub fn default() -> Bss {
-        Bss {
-            bssid: None,
-            frequency: None,
-            beacon_interval: None,
-            seen_ms_ago: None,
-            status: None,
-            signal: None,
-        }
-    }
 }
 
 impl fmt::Display for Bss {
@@ -67,9 +55,12 @@ impl fmt::Display for Bss {
     }
 }
 
-impl ParseNlAttr for Bss {
+impl FromNlAttributeHandle for Bss {
     /// Parse netlink messages returned by the nl80211 command CmdGetScan
-    fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Bss {
+    fn from_handle(handle: AttrHandle<Nl80211Attr>) -> Result<Bss, NlError> {
+        let mut bss = Bss {
+            ..Default::default()
+        };
         for attr in handle.iter() {
             println!("{:?}", attr);
 
@@ -81,20 +72,20 @@ impl ParseNlAttr for Bss {
             for sub_attr in sub_handle.iter() {
                 match sub_attr.nla_type {
                     Nl80211Bss::BssBeaconInterval => {
-                        self.beacon_interval = Some(parse_u16(&sub_attr.payload))
+                        bss.beacon_interval = Some(parse_u16(&sub_attr.payload))
                     }
-                    Nl80211Bss::BssFrequency => self.frequency = Some(parse_u32(&sub_attr.payload)),
+                    Nl80211Bss::BssFrequency => bss.frequency = Some(parse_u32(&sub_attr.payload)),
                     Nl80211Bss::BssSeenMsAgo => {
-                        self.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
+                        bss.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
                     }
-                    Nl80211Bss::BssStatus => self.status = Some(parse_u32(&sub_attr.payload) != 0),
-                    Nl80211Bss::BssBssid => self.bssid = Some(parse_macaddr(&sub_attr.payload)),
-                    Nl80211Bss::BssSignalMbm => self.signal = Some(parse_i32(&sub_attr.payload)),
+                    Nl80211Bss::BssStatus => bss.status = Some(parse_u32(&sub_attr.payload) != 0),
+                    Nl80211Bss::BssBssid => bss.bssid = Some(parse_macaddr(&sub_attr.payload)),
+                    Nl80211Bss::BssSignalMbm => bss.signal = Some(parse_i32(&sub_attr.payload)),
                     _ => (),
                 }
             }
         }
-        self.to_owned()
+        Ok(bss)
     }
 }
 
@@ -188,7 +179,7 @@ mod test_bss {
             },
         ];
 
-        let bss = Bss::default().parse(neli::nlattr::AttrHandle::Owned(handler));
+        let bss = Bss::from_handle(neli::nlattr::AttrHandle::Owned(handler)).unwrap();
         let expected_bss = Bss {
             bssid: Some(MacAddr::from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
             frequency: Some(2412),
