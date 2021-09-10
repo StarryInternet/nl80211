@@ -57,7 +57,7 @@ impl FromNlAttributeHandle for Interface {
                     interface.ssid = Some(parse_string(&attr.payload));
                 }
                 Nl80211Attr::AttrMac => {
-                    interface.mac = Some(parse_macaddr(&attr.payload));
+                    interface.mac = Some(parse_macaddr(&attr.payload)?);
                 }
                 Nl80211Attr::AttrIfname => {
                     interface.name = Some(parse_string(&attr.payload));

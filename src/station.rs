@@ -41,9 +41,9 @@ impl FromNlAttributeHandle for Station {
         };
         for attr in handle.iter() {
             match attr.nla_type {
-                Nl80211Attr::AttrMac => station.bssid = Some(parse_macaddr(&attr.payload)),
+                Nl80211Attr::AttrMac => station.bssid = Some(parse_macaddr(&attr.payload)?),
                 Nl80211Attr::AttrStaInfo => {
-                    let sub_handle = attr.get_nested_attributes::<Nl80211StaInfo>().unwrap();
+                    let sub_handle = attr.get_nested_attributes::<Nl80211StaInfo>()?;
                     for sub_attr in sub_handle.iter() {
                         match sub_attr.nla_type {
                             Nl80211StaInfo::StaInfoSignal => {

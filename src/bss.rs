@@ -68,7 +68,7 @@ impl FromNlAttributeHandle for Bss {
                 continue;
             }
 
-            let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
+            let sub_handle = attr.get_nested_attributes::<Nl80211Bss>()?;
             for sub_attr in sub_handle.iter() {
                 match sub_attr.nla_type {
                     Nl80211Bss::BssBeaconInterval => {
@@ -79,7 +79,7 @@ impl FromNlAttributeHandle for Bss {
                         bss.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
                     }
                     Nl80211Bss::BssStatus => bss.status = Some(parse_u32(&sub_attr.payload) != 0),
-                    Nl80211Bss::BssBssid => bss.bssid = Some(parse_macaddr(&sub_attr.payload)),
+                    Nl80211Bss::BssBssid => bss.bssid = Some(parse_macaddr(&sub_attr.payload)?),
                     Nl80211Bss::BssSignalMbm => bss.signal = Some(parse_i32(&sub_attr.payload)),
                     _ => (),
                 }

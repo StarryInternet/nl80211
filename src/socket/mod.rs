@@ -7,6 +7,7 @@ use crate::cmd::Nl80211Cmd;
 use crate::consts::{NL_80211_GENL_NAME, NL_80211_GENL_VERSION};
 use crate::interface::Interface;
 use neli::consts::{NlFamily, NlmF, Nlmsg};
+use neli::err::NlError;
 use neli::genl::Genlmsghdr;
 use neli::nl::Nlmsghdr;
 use neli::nlattr::Nlattr;
@@ -123,7 +124,12 @@ impl Socket {
 
         while let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                Nlmsg::Error => panic!("Error"),
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
                 Nlmsg::Done => break,
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
@@ -186,10 +192,15 @@ impl Socket {
 
         let mut iter = nl80211sock.iter::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>();
 
-        while let Some(Ok(response)) = iter.next() {
+        if let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                Nlmsg::Error => panic!("Error"),
-                Nlmsg::Done => break,
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
+                Nlmsg::Done => (),
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
                     return Station::from_handle(handle);
@@ -230,10 +241,15 @@ impl Socket {
 
         let mut iter = nl80211sock.iter::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>();
 
-        while let Some(Ok(response)) = iter.next() {
+        if let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                Nlmsg::Error => panic!("Error"),
-                Nlmsg::Done => break,
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
+                Nlmsg::Done => (),
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
                     return Bss::from_handle(handle);

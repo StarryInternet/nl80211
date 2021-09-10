@@ -1,4 +1,5 @@
 use macaddr::MacAddr;
+use neli::err::NlError;
 use std::convert::TryInto;
 
 /// Parse a vec of bytes as a String
@@ -9,19 +10,22 @@ pub fn parse_string(input: &[u8]) -> String {
 }
 
 /// Parse a vec of bytes as a mac address
-pub fn parse_macaddr(input: &[u8]) -> MacAddr {
+pub fn parse_macaddr(input: &[u8]) -> Result<MacAddr, NlError> {
     if input.len() == 6 {
         let array: [u8; 6] = input
             .try_into()
             .expect("Slice with incorrect number of bytes");
-        array.into()
+        Ok(array.into())
     } else if input.len() == 8 {
         let array: [u8; 8] = input
             .try_into()
             .expect("Slice with incorrect number of bytes");
-        array.into()
+        Ok(array.into())
     } else {
-        panic!("Mac address should be 6 or 8 bytes");
+        Err(NlError::Msg(format!(
+            "Encountered a {}-byte MAC address",
+            input.len()
+        )))
     }
 }
 
