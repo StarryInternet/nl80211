@@ -1,6 +1,7 @@
 use crate::attr::{Nl80211Attr, Nl80211RateInfo, Nl80211StaInfo};
+use crate::helpers::parse_macaddr;
 use crate::nl80211traits::*;
-use crate::parse_attr::{parse_i8, parse_macaddr, parse_u32};
+use byteorder::{LittleEndian, ReadBytesExt};
 use macaddr::MacAddr;
 use neli::err::NlError;
 use neli::nlattr::AttrHandle;
@@ -45,47 +46,57 @@ impl FromNlAttributeHandle for Station {
                 Nl80211Attr::AttrStaInfo => {
                     let sub_handle = attr.get_nested_attributes::<Nl80211StaInfo>()?;
                     for sub_attr in sub_handle.iter() {
+                        let mut payload = &sub_attr.payload[..];
+
                         match sub_attr.nla_type {
                             Nl80211StaInfo::StaInfoSignal => {
-                                station.signal = Some(parse_i8(&sub_attr.payload))
+                                station.signal = Some(payload.read_i8()?);
                             }
                             Nl80211StaInfo::StaInfoSignalAvg => {
-                                station.average_signal = Some(parse_i8(&sub_attr.payload))
+                                station.average_signal = Some(payload.read_i8()?);
                             }
                             Nl80211StaInfo::StaInfoBeaconLoss => {
-                                station.beacon_loss = Some(parse_u32(&sub_attr.payload))
+                                station.beacon_loss = Some(payload.read_u32::<LittleEndian>()?);
                             }
                             Nl80211StaInfo::StaInfoConnectedTime => {
-                                station.connected_time = Some(parse_u32(&sub_attr.payload))
+                                station.connected_time = Some(payload.read_u32::<LittleEndian>()?)
                             }
                             Nl80211StaInfo::StaInfoRxPackets => {
-                                station.rx_packets = Some(parse_u32(&sub_attr.payload))
+                                station.rx_packets = Some(payload.read_u32::<LittleEndian>()?)
                             }
                             Nl80211StaInfo::StaInfoTxPackets => {
-                                station.tx_packets = Some(parse_u32(&sub_attr.payload))
+                                station.tx_packets = Some(payload.read_u32::<LittleEndian>()?)
                             }
                             Nl80211StaInfo::StaInfoTxRetries => {
-                                station.tx_retries = Some(parse_u32(&sub_attr.payload))
+                                station.tx_retries = Some(payload.read_u32::<LittleEndian>()?)
                             }
                             Nl80211StaInfo::StaInfoTxFailed => {
-                                station.tx_failed = Some(parse_u32(&sub_attr.payload))
+                                station.tx_failed = Some(payload.read_u32::<LittleEndian>()?)
                             }
                             Nl80211StaInfo::StaInfoRxBitrate => {
                                 let bit_rate_handle =
-                                    sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
+                                    sub_attr.get_nested_attributes::<Nl80211RateInfo>()?;
                                 for sub_sub_attr in bit_rate_handle.iter() {
-                                    if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
-                                        station.rx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
+                                    if sub_sub_attr.nla_type != Nl80211RateInfo::RateInfoBitrate32 {
+                                        continue;
                                     }
+                                    station.rx_bitrate = Some(
+                                        (&sub_sub_attr.payload[..]).read_u32::<LittleEndian>()?,
+                                    );
+                                    break;
                                 }
                             }
                             Nl80211StaInfo::StaInfoTxBitrate => {
                                 let bit_rate_handle =
-                                    sub_attr.get_nested_attributes::<Nl80211RateInfo>().unwrap();
+                                    sub_attr.get_nested_attributes::<Nl80211RateInfo>()?;
                                 for sub_sub_attr in bit_rate_handle.iter() {
-                                    if sub_sub_attr.nla_type == Nl80211RateInfo::RateInfoBitrate32 {
-                                        station.tx_bitrate = Some(parse_u32(&sub_sub_attr.payload))
+                                    if sub_sub_attr.nla_type != Nl80211RateInfo::RateInfoBitrate32 {
+                                        continue;
                                     }
+                                    station.tx_bitrate = Some(
+                                        (&sub_sub_attr.payload[..]).read_u32::<LittleEndian>()?,
+                                    );
+                                    break;
                                 }
                             }
                             _ => (),

@@ -1,7 +1,8 @@
 use crate::attr::Nl80211Attr;
 use crate::attr::Nl80211Bss;
+use crate::helpers::parse_macaddr;
 use crate::nl80211traits::FromNlAttributeHandle;
-use crate::parse_attr::{parse_i32, parse_macaddr, parse_u16, parse_u32};
+use byteorder::{LittleEndian, ReadBytesExt};
 use macaddr::MacAddr;
 use neli::err::NlError;
 use neli::nlattr::AttrHandle;
@@ -70,17 +71,24 @@ impl FromNlAttributeHandle for Bss {
 
             let sub_handle = attr.get_nested_attributes::<Nl80211Bss>()?;
             for sub_attr in sub_handle.iter() {
+                let mut payload = &sub_attr.payload[..];
                 match sub_attr.nla_type {
                     Nl80211Bss::BssBeaconInterval => {
-                        bss.beacon_interval = Some(parse_u16(&sub_attr.payload))
+                        bss.beacon_interval = Some(payload.read_u16::<LittleEndian>()?)
                     }
-                    Nl80211Bss::BssFrequency => bss.frequency = Some(parse_u32(&sub_attr.payload)),
+                    Nl80211Bss::BssFrequency => {
+                        bss.frequency = Some(payload.read_u32::<LittleEndian>()?)
+                    }
                     Nl80211Bss::BssSeenMsAgo => {
-                        bss.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
+                        bss.seen_ms_ago = Some(payload.read_u32::<LittleEndian>()?)
                     }
-                    Nl80211Bss::BssStatus => bss.status = Some(parse_u32(&sub_attr.payload) != 0),
+                    Nl80211Bss::BssStatus => {
+                        bss.status = Some(payload.read_u32::<LittleEndian>()? != 0)
+                    }
                     Nl80211Bss::BssBssid => bss.bssid = Some(parse_macaddr(&sub_attr.payload)?),
-                    Nl80211Bss::BssSignalMbm => bss.signal = Some(parse_i32(&sub_attr.payload)),
+                    Nl80211Bss::BssSignalMbm => {
+                        bss.signal = Some(payload.read_i32::<LittleEndian>()?)
+                    }
                     _ => (),
                 }
             }

@@ -1,8 +1,9 @@
 use crate::attr::*;
+use crate::helpers::{parse_macaddr, parse_string};
 use crate::nl80211traits::FromNlAttributeHandle;
-use crate::parse_attr::{parse_macaddr, parse_string, parse_u32, parse_u64};
 use crate::socket::Socket;
 use crate::station::Station;
+use byteorder::{LittleEndian, ReadBytesExt};
 use macaddr::MacAddr;
 use neli::err::NlError;
 use neli::nlattr::AttrHandle;
@@ -49,9 +50,10 @@ impl FromNlAttributeHandle for Interface {
             ..Default::default()
         };
         for attr in handle.iter() {
+            let mut payload = &attr.payload[..];
             match attr.nla_type {
                 Nl80211Attr::AttrIfindex => {
-                    interface.index = Some(parse_u32(&attr.payload));
+                    interface.index = Some(payload.read_u32::<LittleEndian>()?);
                 }
                 Nl80211Attr::AttrSsid => {
                     interface.ssid = Some(parse_string(&attr.payload));
@@ -62,13 +64,19 @@ impl FromNlAttributeHandle for Interface {
                 Nl80211Attr::AttrIfname => {
                     interface.name = Some(parse_string(&attr.payload));
                 }
-                Nl80211Attr::AttrWiphyFreq => interface.frequency = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrChannelWidth => interface.channel = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrWiphyTxPowerLevel => {
-                    interface.power = Some(parse_u32(&attr.payload))
+                Nl80211Attr::AttrWiphyFreq => {
+                    interface.frequency = Some(payload.read_u32::<LittleEndian>()?)
                 }
-                Nl80211Attr::AttrWiphy => interface.phy = Some(parse_u32(&attr.payload)),
-                Nl80211Attr::AttrWdev => interface.device = Some(parse_u64(&attr.payload)),
+                Nl80211Attr::AttrChannelWidth => {
+                    interface.channel = Some(payload.read_u32::<LittleEndian>()?)
+                }
+                Nl80211Attr::AttrWiphyTxPowerLevel => {
+                    interface.power = Some(payload.read_u32::<LittleEndian>()?)
+                }
+                Nl80211Attr::AttrWiphy => interface.phy = Some(payload.read_u32::<LittleEndian>()?),
+                Nl80211Attr::AttrWdev => {
+                    interface.device = Some(payload.read_u64::<LittleEndian>()?)
+                }
                 _ => (),
             }
         }

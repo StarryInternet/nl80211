@@ -98,7 +98,7 @@ mod cmd;
 pub use cmd::*;
 mod attr;
 pub use attr::*;
-mod parse_attr;
+mod helpers;
 mod socket;
 pub use socket::Socket;
 mod consts;
