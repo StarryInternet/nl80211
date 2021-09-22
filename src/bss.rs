@@ -72,28 +72,25 @@ impl ParseNlAttr for Bss {
     fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Bss {
         for attr in handle.iter() {
             println!("{:?}", attr);
-            if attr.nla_type == Nl80211Attr::AttrBss {
-                let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
-                for sub_attr in sub_handle.iter() {
-                    match sub_attr.nla_type {
-                        Nl80211Bss::BssBeaconInterval => {
-                            self.beacon_interval = Some(parse_u16(&sub_attr.payload))
-                        }
-                        Nl80211Bss::BssFrequency => {
-                            self.frequency = Some(parse_u32(&sub_attr.payload))
-                        }
-                        Nl80211Bss::BssSeenMsAgo => {
-                            self.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
-                        }
-                        Nl80211Bss::BssStatus => {
-                            self.status = Some(parse_u32(&sub_attr.payload) != 0)
-                        }
-                        Nl80211Bss::BssBssid => self.bssid = Some(parse_macaddr(&sub_attr.payload)),
-                        Nl80211Bss::BssSignalMbm => {
-                            self.signal = Some(parse_i32(&sub_attr.payload))
-                        }
-                        _ => (),
+
+            if attr.nla_type != Nl80211Attr::AttrBss {
+                continue;
+            }
+
+            let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
+            for sub_attr in sub_handle.iter() {
+                match sub_attr.nla_type {
+                    Nl80211Bss::BssBeaconInterval => {
+                        self.beacon_interval = Some(parse_u16(&sub_attr.payload))
                     }
+                    Nl80211Bss::BssFrequency => self.frequency = Some(parse_u32(&sub_attr.payload)),
+                    Nl80211Bss::BssSeenMsAgo => {
+                        self.seen_ms_ago = Some(parse_u32(&sub_attr.payload))
+                    }
+                    Nl80211Bss::BssStatus => self.status = Some(parse_u32(&sub_attr.payload) != 0),
+                    Nl80211Bss::BssBssid => self.bssid = Some(parse_macaddr(&sub_attr.payload)),
+                    Nl80211Bss::BssSignalMbm => self.signal = Some(parse_i32(&sub_attr.payload)),
+                    _ => (),
                 }
             }
         }
