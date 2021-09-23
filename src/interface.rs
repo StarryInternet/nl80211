@@ -1,4 +1,5 @@
 use crate::attr::*;
+use crate::bss::Bss;
 use crate::helpers::{parse_macaddr, parse_string};
 use crate::nl80211traits::FromNlAttributeHandle;
 use crate::socket::Socket;
@@ -38,7 +39,20 @@ impl Interface {
         if let Some(index) = self.index {
             Socket::connect()?.get_station_info(index)
         } else {
-            Err(neli::err::NlError::new("Invalid interface index {:?}"))
+            Err(neli::err::NlError::new(
+                "Can't get Station from incomplete interface",
+            ))
+        }
+    }
+
+    /// Get bss info for this interface
+    pub fn get_bss_info(&self) -> Result<Bss, neli::err::NlError> {
+        if let Some(index) = self.index {
+            Socket::connect()?.get_bss_info(index)
+        } else {
+            Err(neli::err::NlError::new(
+                "Can't get Bss from incomplete interface",
+            ))
         }
     }
 }
