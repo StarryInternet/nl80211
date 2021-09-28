@@ -1,88 +1,100 @@
-use std::fmt;
 use crate::attr::*;
-use crate::nl80211traits::ParseNlAttr;
-use crate::parse_attr::parse_u32;
-use crate::parse_attr::parse_u64;
+use crate::bss::Bss;
+use crate::helpers::{parse_macaddr, parse_string};
+use crate::nl80211traits::FromNlAttributeHandle;
 use crate::socket::Socket;
 use crate::station::Station;
+use byteorder::{LittleEndian, ReadBytesExt};
+use macaddr::MacAddr;
+use neli::err::NlError;
 use neli::nlattr::AttrHandle;
-
-use crate::parse_attr::{parse_hex, parse_string};
+use std::fmt;
 
 /// A struct representing a wifi interface
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Interface {
     /// A netlink interface index. This index is used to fetch extra information with nl80211
-    pub index: Option<Vec<u8>>,
+    pub index: Option<u32>,
     /// Interface essid
-    pub ssid: Option<Vec<u8>>,
+    pub ssid: Option<String>,
     /// Interface MAC address
-    pub mac: Option<Vec<u8>>,
-    /// Interface name (u8, String)
-    pub name: Option<Vec<u8>>,
-    /// Interface frequency of the selected channel (u32, MHz)
-    pub frequency: Option<Vec<u8>>,
-    /// Interface chanel
-    pub channel: Option<Vec<u8>>,
+    pub mac: Option<MacAddr>,
+    /// Interface name
+    pub name: Option<String>,
+    /// Interface frequency of the selected channel (MHz)
+    pub frequency: Option<u32>,
+    /// Interface channel
+    pub channel: Option<u32>,
     /// Interface transmit power level in signed mBm units.
-    pub power: Option<Vec<u8>>,
+    pub power: Option<u32>,
     /// index of wiphy to operate on, cf. /sys/class/ieee80211/<phyname>/index
-    pub phy: Option<Vec<u8>>,
-    /// Wireless device identifier, used for pseudo-devices that don't have a netdev (u64)
-    pub device: Option<Vec<u8>>,
+    pub phy: Option<u32>,
+    /// Wireless device identifier, used for pseudo-devices that don't have a netdev
+    pub device: Option<u64>,
 }
 
 impl Interface {
-    pub fn default() -> Interface {
-        Interface {
-            index: None,
-            ssid: None,
-            mac: None,
-            name: None,
-            frequency: None,
-            channel: None,
-            power: None,
-            phy: None,
-            device: None,
+    /// Get station info for this interface
+    pub fn get_station_info(&self) -> Result<Station, neli::err::NlError> {
+        if let Some(index) = self.index {
+            Socket::connect()?.get_station_info(index)
+        } else {
+            Err(neli::err::NlError::new(
+                "Can't get Station from incomplete interface",
+            ))
         }
     }
 
-    /// Get station info for this interface
-    pub fn get_station_info(&self) -> Result<Station, neli::err::NlError> {
-        if let Some(index) = &self.index {
-            Socket::connect()?.get_station_info(index)
+    /// Get bss info for this interface
+    pub fn get_bss_info(&self) -> Result<Bss, neli::err::NlError> {
+        if let Some(index) = self.index {
+            Socket::connect()?.get_bss_info(index)
         } else {
-            Err(neli::err::NlError::new("Invalid interface index {:?}"))
+            Err(neli::err::NlError::new(
+                "Can't get Bss from incomplete interface",
+            ))
         }
     }
 }
 
-impl ParseNlAttr for Interface {
+impl FromNlAttributeHandle for Interface {
     /// Parse netlink messages returned by the nl80211 command CmdGetInterface
-    fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Interface {
+    fn from_handle(handle: AttrHandle<Nl80211Attr>) -> Result<Interface, NlError> {
+        let mut interface = Interface {
+            ..Default::default()
+        };
         for attr in handle.iter() {
+            let mut payload = &attr.payload[..];
             match attr.nla_type {
                 Nl80211Attr::AttrIfindex => {
-                    self.index = Some(attr.payload.clone());
+                    interface.index = Some(payload.read_u32::<LittleEndian>()?);
                 }
                 Nl80211Attr::AttrSsid => {
-                    self.ssid = Some(attr.payload.clone());
+                    interface.ssid = Some(parse_string(&attr.payload));
                 }
                 Nl80211Attr::AttrMac => {
-                    self.mac = Some(attr.payload.clone());
+                    interface.mac = Some(parse_macaddr(&attr.payload)?);
                 }
                 Nl80211Attr::AttrIfname => {
-                    self.name = Some(attr.payload.clone());
+                    interface.name = Some(parse_string(&attr.payload));
                 }
-                Nl80211Attr::AttrWiphyFreq => self.frequency = Some(attr.payload.clone()),
-                Nl80211Attr::AttrChannelWidth => self.channel = Some(attr.payload.clone()),
-                Nl80211Attr::AttrWiphyTxPowerLevel => self.power = Some(attr.payload.clone()),
-                Nl80211Attr::AttrWiphy => self.phy = Some(attr.payload.clone()),
-                Nl80211Attr::AttrWdev => self.device = Some(attr.payload.clone()),
+                Nl80211Attr::AttrWiphyFreq => {
+                    interface.frequency = Some(payload.read_u32::<LittleEndian>()?)
+                }
+                Nl80211Attr::AttrChannelWidth => {
+                    interface.channel = Some(payload.read_u32::<LittleEndian>()?)
+                }
+                Nl80211Attr::AttrWiphyTxPowerLevel => {
+                    interface.power = Some(payload.read_u32::<LittleEndian>()?)
+                }
+                Nl80211Attr::AttrWiphy => interface.phy = Some(payload.read_u32::<LittleEndian>()?),
+                Nl80211Attr::AttrWdev => {
+                    interface.device = Some(payload.read_u64::<LittleEndian>()?)
+                }
                 _ => (),
             }
         }
-        self.to_owned()
+        Ok(interface)
     }
 }
 
@@ -91,38 +103,35 @@ impl fmt::Display for Interface {
         let mut result = Vec::new();
 
         if let Some(ssid) = &self.ssid {
-            result.push(format!("essid : {}", parse_string(&ssid)))
+            result.push(format!("essid : {}", ssid))
         };
 
         if let Some(mac) = &self.mac {
-            result.push(format!("mac : {}", parse_hex(&mac)))
+            result.push(format!("mac : {}", mac))
         };
 
         if let Some(name) = &self.name {
-            result.push(format!("interface : {}", parse_string(&name)))
+            result.push(format!("interface : {}", name))
         };
 
-        if let Some(frequency) = &self.frequency {
-            result.push(format!(
-                "frequency : {} Ghz",
-                parse_u32(frequency) as f64 / 1000.00
-            ))
+        if let Some(frequency) = self.frequency {
+            result.push(format!("frequency : {} Ghz", frequency as f64 / 1000.00))
         };
 
         if let Some(chanel) = &self.channel {
-            result.push(format!("channel : {}", parse_u32(chanel)))
+            result.push(format!("channel : {}", chanel))
         };
 
         if let Some(power) = &self.power {
-            result.push(format!("power : {} dBm", parse_u32(power) / 100))
+            result.push(format!("power : {} dBm", power / 100))
         };
 
         if let Some(phy) = &self.phy {
-            result.push(format!("phy : {}", parse_u32(phy)))
+            result.push(format!("phy : {}", phy))
         };
 
         if let Some(device) = &self.device {
-            result.push(format!("device : {}", parse_u64(device)))
+            result.push(format!("device : {}", device))
         };
 
         write!(f, "{}", result.join("\n"))
@@ -138,15 +147,15 @@ mod test_interface {
     #[test]
     fn test_pretty_format() {
         let interface = Interface {
-            index: Some(vec![3, 0, 0, 0]),
-            ssid: Some(vec![101, 100, 117, 114, 111, 97, 109]),
-            mac: Some(vec![255, 255, 255, 255, 255, 255]),
-            name: Some(vec![119, 108, 112, 53, 115, 48]),
-            frequency: Some(vec![108, 9, 0, 0]),
-            channel: Some(vec![1, 0, 0, 0]),
-            power: Some(vec![164, 6, 0, 0]),
-            phy: Some(vec![0, 0, 0, 0]),
-            device: Some(vec![1, 0, 0, 0, 0, 0, 0, 0]),
+            index: Some(3),
+            ssid: Some("eduroam".into()),
+            mac: Some(MacAddr::from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
+            name: Some("wlp5s0".into()),
+            frequency: Some(2412),
+            channel: Some(1),
+            power: Some(1700),
+            phy: Some(0),
+            device: Some(1),
         };
 
         let expected_output = r#"essid : eduroam
@@ -239,18 +248,18 @@ mod test_interface {
             },
         ];
 
-        let interface = Interface::default().parse(neli::nlattr::AttrHandle::Owned(handler));
+        let interface = Interface::from_handle(neli::nlattr::AttrHandle::Owned(handler)).unwrap();
 
         let expected_interface = Interface {
-            index: Some(vec![3, 0, 0, 0]),
-            ssid: Some(vec![101, 100, 117, 114, 111, 97, 109]),
-            mac: Some(vec![255, 255, 255, 255, 255, 255]),
-            name: Some(vec![119, 108, 112, 53, 115, 48]),
-            frequency: Some(vec![108, 9, 0, 0]),
-            channel: Some(vec![1, 0, 0, 0]),
-            power: Some(vec![164, 6, 0, 0]),
-            phy: Some(vec![0, 0, 0, 0]),
-            device: Some(vec![1, 0, 0, 0, 0, 0, 0, 0]),
+            index: Some(3),
+            ssid: Some("eduroam".into()),
+            mac: Some(MacAddr::from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
+            name: Some("wlp5s0".into()),
+            frequency: Some(2412),
+            channel: Some(1),
+            power: Some(1700),
+            phy: Some(0),
+            device: Some(1),
         };
 
         assert_eq!(interface, expected_interface)

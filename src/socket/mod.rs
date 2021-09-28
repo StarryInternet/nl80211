@@ -1,16 +1,17 @@
 use crate::bss::Bss;
+use crate::nl80211traits::FromNlAttributeHandle;
 use crate::station::Station;
-use crate::nl80211traits::ParseNlAttr;
 // use crate::station::parse_station;
-use neli::consts::{NlFamily,NlmF,Nlmsg};
-use neli::socket::NlSocket;
-use neli::nl::Nlmsghdr;
-use neli::genl::Genlmsghdr;
-use crate::consts::{NL_80211_GENL_NAME, NL_80211_GENL_VERSION};
 use crate::attr::Nl80211Attr;
 use crate::cmd::Nl80211Cmd;
+use crate::consts::{NL_80211_GENL_NAME, NL_80211_GENL_VERSION};
 use crate::interface::Interface;
+use neli::consts::{NlFamily, NlmF, Nlmsg};
+use neli::err::NlError;
+use neli::genl::Genlmsghdr;
+use neli::nl::Nlmsghdr;
 use neli::nlattr::Nlattr;
+use neli::socket::NlSocket;
 
 /// A generic netlink socket to send commands and receive messages
 pub struct Socket {
@@ -69,10 +70,8 @@ impl Socket {
     /// # }
     /// ```
     pub fn connect() -> Result<Self, neli::err::NlError> {
-        let family_id = {
-            NlSocket::new(NlFamily::Generic, true)?
-                .resolve_genl_family(NL_80211_GENL_NAME)?
-        };
+        let family_id =
+            NlSocket::new(NlFamily::Generic, true)?.resolve_genl_family(NL_80211_GENL_NAME)?;
 
         let track_seq = true;
         let mut nl80211sock = NlSocket::new(NlFamily::Generic, track_seq)?;
@@ -83,7 +82,7 @@ impl Socket {
 
         Ok(Self {
             sock: nl80211sock,
-            family_id: family_id,
+            family_id,
         })
     }
 
@@ -125,12 +124,17 @@ impl Socket {
 
         while let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                Nlmsg::Error => panic!("Error"),
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
                 Nlmsg::Done => break,
                 _ => {
                     let handle = response.nl_payload.get_attr_handle();
-                    interfaces.push(Interface::default().parse(handle));
-                },
+                    interfaces.push(Interface::from_handle(handle)?);
+                }
             };
         }
 
@@ -151,18 +155,26 @@ impl Socket {
     ///     if let Some(netlink_index) = wifi_interface.index {
     ///
     ///       // Then for each wifi interface we can fetch station information
-    ///       let station_info = Socket::connect()?.get_station_info(&netlink_index.clone())?;
+    ///       let station_info = Socket::connect()?.get_station_info(netlink_index)?;
     ///           println!("{}", station_info);
     ///       }
     ///     }
     /// #   Ok(())
     /// # }
     ///```
-    pub fn get_station_info(&mut self, interface_attr_if_index: &Vec<u8>) -> Result<Station, neli::err::NlError>  {
+    pub fn get_station_info(
+        &mut self,
+        interface_attr_if_index: u32,
+    ) -> Result<Station, neli::err::NlError> {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];
-        let new_attr= Nlattr::new(None, Nl80211Attr::AttrIfindex, interface_attr_if_index.to_owned())?;
+        let interface_attr_if_index = interface_attr_if_index.to_le_bytes();
+        let new_attr = Nlattr::new(
+            None,
+            Nl80211Attr::AttrIfindex,
+            interface_attr_if_index.to_vec(),
+        )?;
         attrs.push(new_attr);
 
         let genlhdr = Genlmsghdr::new(Nl80211Cmd::CmdGetStation, NL_80211_GENL_VERSION, attrs)?;
@@ -180,25 +192,38 @@ impl Socket {
 
         let mut iter = nl80211sock.iter::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>();
 
-        while let Some(Ok(response)) = iter.next() {
+        if let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                    Nlmsg::Error => panic!("Error"),
-                    Nlmsg::Done => break,
-                    _ => {
-                        let  handle = response.nl_payload.get_attr_handle();
-                        return Ok(Station::default().parse(handle));
-                    },
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
+                Nlmsg::Done => (),
+                _ => {
+                    let handle = response.nl_payload.get_attr_handle();
+                    return Station::from_handle(handle);
+                }
             };
         }
-        return Ok(Station::default())
+        Ok(Station::default())
     }
 
-    pub fn get_bss_info(&mut self, interface_attr_if_index: &Vec<u8>) -> Result<Bss, neli::err::NlError> {
+    pub fn get_bss_info(
+        &mut self,
+        interface_attr_if_index: u32,
+    ) -> Result<Bss, neli::err::NlError> {
         let nl80211sock = &mut self.sock;
 
         let mut attrs: Vec<Nlattr<Nl80211Attr, Vec<u8>>> = vec![];
 
-        let new_attr= Nlattr::new(None, Nl80211Attr::AttrIfindex, interface_attr_if_index.to_owned())?;
+        let interface_attr_if_index = interface_attr_if_index.to_le_bytes();
+        let new_attr = Nlattr::new(
+            None,
+            Nl80211Attr::AttrIfindex,
+            interface_attr_if_index.to_vec(),
+        )?;
         attrs.push(new_attr);
 
         let genlhdr = Genlmsghdr::new(Nl80211Cmd::CmdGetScan, NL_80211_GENL_VERSION, attrs)?;
@@ -216,16 +241,21 @@ impl Socket {
 
         let mut iter = nl80211sock.iter::<Nlmsg, Genlmsghdr<Nl80211Cmd, Nl80211Attr>>();
 
-        while let Some(Ok(response)) = iter.next() {
+        if let Some(Ok(response)) = iter.next() {
             match response.nl_type {
-                    Nlmsg::Error => panic!("Error"),
-                    Nlmsg::Done => break,
-                    _ => {
-                        let  handle = response.nl_payload.get_attr_handle();
-                        return Ok(Bss::default().parse(handle))
-                    }
+                Nlmsg::Error => {
+                    return Err(NlError::Msg(format!(
+                        "Received error response from socket: {:?}",
+                        response
+                    )))
+                }
+                Nlmsg::Done => (),
+                _ => {
+                    let handle = response.nl_payload.get_attr_handle();
+                    return Bss::from_handle(handle);
                 }
             }
+        }
         Ok(Bss::default())
     }
 

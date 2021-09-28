@@ -34,15 +34,15 @@
 //!       println!("{:#?}", interface);
 //!
 //!       // Interface {
-//!       //   index: Some([3, 0, 0, 0]),
-//!       //   ssid: Some([101, 100, 117, 114, 111, 97, 109]),
-//!       //   mac: Some([255, 255, 255, 255, 255, 255]),
-//!       //   name: Some([119, 108, 112, 53, 115, 48]),
-//!       //   frequency: Some([108, 9, 0, 0]),
-//!       //   channel: Some([1, 0, 0, 0]),
-//!       //   power: Some([164, 6, 0, 0]),
-//!       //   phy: Some([0, 0, 0, 0]),
-//!       //   device: Some([1, 0, 0, 0, 0, 0, 0, 0])
+//!       //   index: Some(3),
+//!       //   ssid: Some("eduroam"),
+//!       //   mac: Some(MacAddr(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF)),
+//!       //   name: Some("wlp5s0"),
+//!       //   frequency: Some(2412),
+//!       //   channel: Some(1),
+//!       //   power: Some(1700),
+//!       //   phy: Some(0),
+//!       //   device: Some(1)
 //!       // }
 //!
 //!       println!("{}", interface);
@@ -82,8 +82,8 @@
 //!       // average signal : -61 dBm
 //!       // rx packets : 148983
 //!       // tx packets : 46335
-//!       // rx bitrate : 60 Mb/s
-//!       // tx bitrate : 140 Mb/s
+//!       // rx bitrate : 650.0 Mb/s
+//!       // tx bitrate : 866.7 Mb/s
 //!       // tx retries : 12578
 //!       // tx failed : 2
 //!   }
@@ -98,8 +98,7 @@ mod cmd;
 pub use cmd::*;
 mod attr;
 pub use attr::*;
-mod parse_attr;
-pub use parse_attr::*;
+mod helpers;
 mod socket;
 pub use socket::Socket;
 mod consts;

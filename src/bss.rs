@@ -1,37 +1,27 @@
-use std::fmt;
 use crate::attr::Nl80211Attr;
 use crate::attr::Nl80211Bss;
-use crate::nl80211traits::ParseNlAttr;
-use crate::parse_attr::{parse_hex, parse_i32, parse_u16, parse_u32};
+use crate::helpers::parse_macaddr;
+use crate::nl80211traits::FromNlAttributeHandle;
+use byteorder::{LittleEndian, ReadBytesExt};
+use macaddr::MacAddr;
+use neli::err::NlError;
 use neli::nlattr::AttrHandle;
+use std::fmt;
 
 /// A struct representing a BSS (Basic Service Set)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bss {
-    pub bssid: Option<Vec<u8>>,
-    /// Frequency in MHz (u32)
-    pub frequency: Option<Vec<u8>>,
-    /// Beacon interval of the (I)BSS (u16)
-    pub beacon_interval: Option<Vec<u8>>,
-    /// Age of this BSS entry in ms (u32)
-    pub seen_ms_ago: Option<Vec<u8>>,
-    /// Status, if this BSS is "used" (u8)
-    pub status: Option<Vec<u8>>,
-    /// Signal strength of probe response/beacon in mBm (100 * dBm) (i32)
-    pub signal: Option<Vec<u8>>,
-}
-
-impl Bss {
-    pub fn default() -> Bss {
-        Bss {
-            bssid: None,
-            frequency: None,
-            beacon_interval: None,
-            seen_ms_ago: None,
-            status: None,
-            signal: None,
-        }
-    }
+    pub bssid: Option<MacAddr>,
+    /// Frequency in MHz
+    pub frequency: Option<u32>,
+    /// Beacon interval of the (I)BSS
+    pub beacon_interval: Option<u16>,
+    /// Age of this BSS entry in ms
+    pub seen_ms_ago: Option<u32>,
+    /// Status, if this BSS is "used"
+    pub status: Option<bool>,
+    /// Signal strength of probe response/beacon in mBm (100 * dBm)
+    pub signal: Option<i32>,
 }
 
 impl fmt::Display for Bss {
@@ -39,74 +29,71 @@ impl fmt::Display for Bss {
         let mut result = Vec::new();
 
         if let Some(bssid) = &self.bssid {
-            result.push(format!("bssid : {}", parse_hex(bssid)))
+            result.push(format!("bssid : {}", bssid))
         };
 
-        if let Some(frequency) = &self.frequency {
-            result.push(format!(
-                "frequency : {} Ghz",
-                parse_u32(frequency) as f32 / 1000.00
-            ))
+        if let Some(frequency) = self.frequency {
+            result.push(format!("frequency : {} Ghz", frequency as f32 / 1000.00))
         };
 
         if let Some(beacon_interval) = &self.beacon_interval {
-            result.push(format!(
-                "beacon interval : {} TUs",
-                parse_u16(beacon_interval)
-            ))
+            result.push(format!("beacon interval : {} TUs", beacon_interval))
         };
 
         if let Some(seen_ms_ago) = &self.seen_ms_ago {
-            result.push(format!("last seen : {} ms", parse_u32(seen_ms_ago)))
+            result.push(format!("last seen : {} ms", seen_ms_ago))
         };
 
         if let Some(status) = &self.status {
-            result.push(format!("status : {}", parse_u32(status)))
+            result.push(format!("status : {}", status))
         };
 
-        if let Some(signal) = &self.signal {
-            result.push(format!(
-                "signal : {:?} dBm",
-                parse_i32(signal) as f32 / 100.00
-            ))
+        if let Some(signal) = self.signal {
+            result.push(format!("signal : {:?} dBm", signal as f32 / 100.00))
         };
 
         write!(f, "{}", result.join("\n"))
     }
 }
 
-impl ParseNlAttr for Bss {
+impl FromNlAttributeHandle for Bss {
     /// Parse netlink messages returned by the nl80211 command CmdGetScan
-    fn parse(&mut self, handle: AttrHandle<Nl80211Attr>) -> Bss {
+    fn from_handle(handle: AttrHandle<Nl80211Attr>) -> Result<Bss, NlError> {
+        let mut bss = Bss {
+            ..Default::default()
+        };
         for attr in handle.iter() {
             println!("{:?}", attr);
-            match attr.nla_type {
-                Nl80211Attr::AttrBss => {
-                    let sub_handle = attr.get_nested_attributes::<Nl80211Bss>().unwrap();
-                    for sub_attr in sub_handle.iter() {
-                        match sub_attr.nla_type {
-                            Nl80211Bss::BssBeaconInterval => {
-                                self.beacon_interval = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssFrequency => {
-                                self.frequency = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssSeenMsAgo => {
-                                self.seen_ms_ago = Some(sub_attr.payload.clone())
-                            }
-                            Nl80211Bss::BssStatus => self.status = Some(sub_attr.payload.clone()),
-                            Nl80211Bss::BssBssid => self.bssid = Some(sub_attr.payload.clone()),
-                            Nl80211Bss::BssSignalMbm => {
-                                self.signal = Some(sub_attr.payload.clone())
-                            }
-                            _ => (),
-                        }
+
+            if attr.nla_type != Nl80211Attr::AttrBss {
+                continue;
+            }
+
+            let sub_handle = attr.get_nested_attributes::<Nl80211Bss>()?;
+            for sub_attr in sub_handle.iter() {
+                let mut payload = &sub_attr.payload[..];
+                match sub_attr.nla_type {
+                    Nl80211Bss::BssBeaconInterval => {
+                        bss.beacon_interval = Some(payload.read_u16::<LittleEndian>()?)
                     }
+                    Nl80211Bss::BssFrequency => {
+                        bss.frequency = Some(payload.read_u32::<LittleEndian>()?)
+                    }
+                    Nl80211Bss::BssSeenMsAgo => {
+                        bss.seen_ms_ago = Some(payload.read_u32::<LittleEndian>()?)
+                    }
+                    Nl80211Bss::BssStatus => {
+                        bss.status = Some(payload.read_u32::<LittleEndian>()? != 0)
+                    }
+                    Nl80211Bss::BssBssid => bss.bssid = Some(parse_macaddr(&sub_attr.payload)?),
+                    Nl80211Bss::BssSignalMbm => {
+                        bss.signal = Some(payload.read_i32::<LittleEndian>()?)
+                    }
+                    _ => (),
                 }
-                _ => (),
             }
         }
-        self.to_owned()
+        Ok(bss)
     }
 }
 
@@ -119,19 +106,19 @@ mod test_bss {
     #[test]
     fn test_pretty_format() {
         let bss = Bss {
-            bssid: Some(vec![255, 255, 255, 255, 255, 255]),
-            frequency: Some(vec![108, 9, 0, 0]),
-            beacon_interval: Some(vec![100, 0]),
-            seen_ms_ago: Some(vec![100, 0, 0, 0]),
-            status: Some(vec![1, 0, 0, 0]),
-            signal: Some(vec![76, 235, 255, 255]),
+            bssid: Some(MacAddr::from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
+            frequency: Some(2412),
+            beacon_interval: Some(100),
+            seen_ms_ago: Some(100),
+            status: Some(true),
+            signal: Some(-5300),
         };
 
         let expected_output = r#"bssid : FF:FF:FF:FF:FF:FF
         frequency : 2.412 Ghz
         beacon interval : 100 TUs
         last seen : 100 ms
-        status : 1
+        status : true
         signal : -53.0 dBm"#;
 
         assert_eq!(
@@ -200,14 +187,14 @@ mod test_bss {
             },
         ];
 
-        let bss = Bss::default().parse(neli::nlattr::AttrHandle::Owned(handler));
+        let bss = Bss::from_handle(neli::nlattr::AttrHandle::Owned(handler)).unwrap();
         let expected_bss = Bss {
-            bssid: Some(vec![255, 255, 255, 255, 255, 255]),
-            frequency: Some(vec![108, 9, 0, 0]),
-            beacon_interval: Some(vec![100, 0]),
-            seen_ms_ago: Some(vec![100, 0, 0, 0]),
-            status: Some(vec![1, 0, 0, 0]),
-            signal: Some(vec![76, 235, 255, 255]),
+            bssid: Some(MacAddr::from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
+            frequency: Some(2412),
+            beacon_interval: Some(100),
+            seen_ms_ago: Some(100),
+            status: Some(true),
+            signal: Some(-5300),
         };
 
         assert_eq!(bss, expected_bss)
